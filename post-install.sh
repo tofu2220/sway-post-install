@@ -144,6 +144,37 @@ clean_system() {
   run_stage 'Clear package caches' yay -Scc
 }
 
+write_checklist() {
+  local destination=$1 directory temporary index
+  directory=$(dirname -- "$destination")
+  temporary=$(mktemp --tmpdir="$directory" '.manual-post-install.XXXXXX') || {
+    die "cannot create checklist temporary file in: $directory"
+    return 1
+  }
+
+  {
+    printf 'Manual post-install checklist\n'
+    printf '==============================\n'
+    for index in "${!REMINDERS[@]}"; do
+      printf '[ ] %d. %s\n' "$((index + 1))" "${REMINDERS[$index]}"
+    done
+  } >"$temporary" || {
+    rm -f -- "$temporary"
+    die 'cannot write checklist'
+    return 1
+  }
+
+  mv -- "$temporary" "$destination" || {
+    rm -f -- "$temporary"
+    die "cannot replace checklist: $destination"
+    return 1
+  }
+
+  printf '==> Manual configuration remains\n'
+  cat -- "$destination"
+  printf 'Saved checklist: %s\n' "$destination"
+}
+
 main() {
   local config_path=${1:-"$SCRIPT_DIR/post-install.conf"}
   local checklist_path=${2:-"$SCRIPT_DIR/manual-post-install-checklist.txt"}
@@ -152,14 +183,13 @@ main() {
     die 'run this script as a regular user, not root'
     return 1
   }
-  require_commands bash pacman yay sudo mktemp mv || return 1
+  require_commands bash pacman yay sudo mktemp mv dirname cat rm || return 1
   parse_config "$config_path" || return 1
   run_stage 'Authenticate sudo' sudo -v || return 1
   install_packages || return 1
   remove_configured_packages || return 1
   clean_system || return 1
-
-  : "$checklist_path"
+  write_checklist "$checklist_path" || return 1
 }
 
 if [[ ${BASH_SOURCE[0]} == "$0" ]]; then

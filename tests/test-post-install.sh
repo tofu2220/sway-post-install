@@ -91,6 +91,15 @@ assert_succeeds() {
   fi
 }
 
+assert_file_exists() {
+  local path=$1 message=$2
+  if [[ -f $path ]]; then
+    pass "$message"
+  else
+    fail "$message (missing: $path)"
+  fi
+}
+
 write_config() {
   local name=$1
   shift
@@ -241,6 +250,61 @@ assert_file_excludes 'yay -Yc' "$MOCK_LOG" \
 assert_file_excludes 'yay -Scc' "$MOCK_LOG" \
   'does not clear caches after explicit removal fails'
 export MOCK_FAIL=''
+
+REMINDERS=('Enable Bluetooth' 'Configure Fcitx5')
+checklist="$TEST_TMP/checklist.txt"
+assert_succeeds 'writes a manual checklist' write_checklist "$checklist"
+assert_file_eq $'Manual post-install checklist\n==============================\n[ ] 1. Enable Bluetooth\n[ ] 2. Configure Fcitx5' \
+  "$checklist" 'writes numbered reminders with a stable heading'
+
+readonly_dir="$TEST_TMP/readonly"
+mkdir "$readonly_dir"
+printf 'existing checklist\n' >"$readonly_dir/checklist.txt"
+chmod 500 "$readonly_dir"
+assert_fails_with 'cannot create checklist temporary file in:' \
+  write_checklist "$readonly_dir/checklist.txt"
+chmod 700 "$readonly_dir"
+assert_file_eq 'existing checklist' "$readonly_dir/checklist.txt" \
+  'preserves the previous checklist when temporary creation fails'
+
+export MOCK_INSTALLED='file-roller'
+export MOCK_FAIL=''
+: >"$MOCK_LOG"
+final_checklist="$TEST_TMP/final.txt"
+assert_succeeds 'main generates a checklist after every package stage succeeds' \
+  main "$TEST_TMP/valid.conf" "$final_checklist"
+assert_file_eq $'sudo -v\nsudo pacman -Syu --needed micro fcitx5\nyay -S --needed --removemake --cleanafter auto-cpufreq\nsudo pacman -Rns file-roller\nyay -Yc\nyay -Scc' \
+  "$MOCK_LOG" 'complete execution retains the approved command order'
+assert_file_eq $'Manual post-install checklist\n==============================\n[ ] 1. Enable Bluetooth manually' \
+  "$final_checklist" 'main writes reminders from the supplied config'
+
+printf 'old checklist\n' >"$final_checklist"
+export MOCK_FAIL='yay -S --needed --removemake --cleanafter auto-cpufreq'
+: >"$MOCK_LOG"
+assert_fails_with 'stage failed: Install AUR packages' \
+  main "$TEST_TMP/valid.conf" "$final_checklist"
+assert_file_eq 'old checklist' "$final_checklist" \
+  'does not replace a checklist after installation failure'
+assert_file_excludes 'pacman -Rns' "$MOCK_LOG" \
+  'does not remove packages after installation failure'
+assert_file_excludes 'yay -Yc' "$MOCK_LOG" \
+  'does not remove orphans after installation failure'
+assert_file_excludes 'yay -Scc' "$MOCK_LOG" \
+  'does not clear caches after installation failure'
+export MOCK_FAIL=''
+
+portable_copy="$TEST_TMP/portable-copy"
+mkdir "$portable_copy"
+cp "$PROJECT_DIR/post-install.sh" "$PROJECT_DIR/post-install.conf" "$portable_copy/"
+: >"$MOCK_LOG"
+(
+  cd "$TEST_TMP" || exit 1
+  bash "$portable_copy/post-install.sh"
+) >/dev/null 2>&1
+portable_status=$?
+assert_eq '0' "$portable_status" 'runs successfully outside the script directory'
+assert_file_exists "$portable_copy/manual-post-install-checklist.txt" \
+  'writes the default checklist beside the script'
 
 printf '%d passed, %d failed\n' "$passed" "$failed"
 ((failed == 0))
