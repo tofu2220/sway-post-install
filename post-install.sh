@@ -7,6 +7,7 @@ PACMAN_PACKAGES=()
 AUR_PACKAGES=()
 REMOVE_PACKAGES=()
 REMINDERS=()
+INSTALLED_REMOVALS=()
 
 die() {
   printf 'ERROR: %s\n' "$*" >&2
@@ -120,10 +121,22 @@ install_packages() {
 }
 
 collect_installed_removals() {
-  local package
+  local package installed_package installed_output
+  local -A installed_packages=()
+
+  INSTALLED_REMOVALS=()
+  installed_output=$(pacman -Qq) || {
+    die 'cannot query installed packages'
+    return 1
+  }
+
+  while IFS= read -r installed_package; do
+    [[ -n $installed_package ]] && installed_packages[$installed_package]=1
+  done <<<"$installed_output"
+
   for package in "${REMOVE_PACKAGES[@]}"; do
-    if pacman -Qq "$package" >/dev/null 2>&1; then
-      printf '%s\0' "$package"
+    if [[ -n ${installed_packages[$package]+x} ]]; then
+      INSTALLED_REMOVALS+=("$package")
     else
       printf 'Skipping absent package: %s\n' "$package" >&2
     fi
@@ -131,11 +144,10 @@ collect_installed_removals() {
 }
 
 remove_configured_packages() {
-  local -a installed=()
-  mapfile -d '' -t installed < <(collect_installed_removals)
-  if ((${#installed[@]} > 0)); then
+  collect_installed_removals || return 1
+  if ((${#INSTALLED_REMOVALS[@]} > 0)); then
     run_stage 'Remove configured packages' \
-      sudo pacman -Rns "${installed[@]}"
+      sudo pacman -Rns "${INSTALLED_REMOVALS[@]}"
   fi
 }
 
@@ -146,6 +158,10 @@ clean_system() {
 
 write_checklist() {
   local destination=$1 directory temporary index
+  [[ ! -d $destination ]] || {
+    die "checklist destination is a directory: $destination"
+    return 1
+  }
   directory=$(dirname -- "$destination")
   temporary=$(mktemp --tmpdir="$directory" '.manual-post-install.XXXXXX') || {
     die "cannot create checklist temporary file in: $directory"
@@ -164,14 +180,17 @@ write_checklist() {
     return 1
   }
 
-  mv -- "$temporary" "$destination" || {
+  mv -T -- "$temporary" "$destination" || {
     rm -f -- "$temporary"
     die "cannot replace checklist: $destination"
     return 1
   }
 
   printf '==> Manual configuration remains\n'
-  cat -- "$destination"
+  cat -- "$destination" || {
+    die "cannot read checklist after saving: $destination"
+    return 1
+  }
   printf 'Saved checklist: %s\n' "$destination"
 }
 

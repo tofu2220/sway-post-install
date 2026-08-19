@@ -143,7 +143,7 @@ setup_mocks() {
   MOCK_LOG="$TEST_TMP/commands.log"
   mkdir -p "$MOCK_BIN"
   : >"$MOCK_LOG"
-  export MOCK_LOG MOCK_FAIL='' MOCK_INSTALLED=''
+  export MOCK_LOG MOCK_FAIL='' MOCK_INSTALLED='' MOCK_QUERY_FAIL=''
 
   local name
   for name in pacman yay sudo; do
@@ -152,6 +152,11 @@ setup_mocks() {
       'command_name=$(basename -- "$0")' \
       'command_line="$command_name $*"' \
       'if [[ $command_name == pacman && ${1:-} == -Qq ]]; then' \
+      '  [[ -z ${MOCK_QUERY_FAIL:-} ]] || exit 2' \
+      '  if (($# == 1)); then' \
+      '    for installed_package in ${MOCK_INSTALLED:-}; do printf "%s\n" "$installed_package"; done' \
+      '    exit 0' \
+      '  fi' \
       '  [[ " ${MOCK_INSTALLED:-} " == *" ${2:-} "* ]]' \
       '  exit' \
       'fi' \
@@ -218,6 +223,14 @@ assert_succeeds 'skips removal when no configured package is installed' \
   remove_configured_packages
 assert_file_eq '' "$MOCK_LOG" 'does not start an empty removal transaction'
 
+REMOVE_PACKAGES=(file-roller)
+export MOCK_QUERY_FAIL=1
+: >"$MOCK_LOG"
+assert_fails_with 'cannot query installed packages' remove_configured_packages
+assert_file_eq '' "$MOCK_LOG" \
+  'does not start removal when the installed-package query fails'
+export MOCK_QUERY_FAIL=''
+
 : >"$MOCK_LOG"
 assert_succeeds 'removes orphans before clearing caches' clean_system
 assert_file_eq $'yay -Yc\nyay -Scc' "$MOCK_LOG" \
@@ -257,14 +270,23 @@ assert_succeeds 'writes a manual checklist' write_checklist "$checklist"
 assert_file_eq $'Manual post-install checklist\n==============================\n[ ] 1. Enable Bluetooth\n[ ] 2. Configure Fcitx5' \
   "$checklist" 'writes numbered reminders with a stable heading'
 
-readonly_dir="$TEST_TMP/readonly"
-mkdir "$readonly_dir"
-printf 'existing checklist\n' >"$readonly_dir/checklist.txt"
-chmod 500 "$readonly_dir"
+directory_destination="$TEST_TMP/checklist-directory"
+mkdir "$directory_destination"
+assert_fails_with 'checklist destination is a directory:' \
+  write_checklist "$directory_destination"
+directory_contents=$(find "$directory_destination" -mindepth 1 -maxdepth 1 -print)
+assert_eq '' "$directory_contents" \
+  'does not move a temporary checklist into a directory destination'
+
+temporary_failure_destination="$TEST_TMP/temporary-failure.txt"
+printf 'existing checklist\n' >"$temporary_failure_destination"
+mktemp() {
+  return 1
+}
 assert_fails_with 'cannot create checklist temporary file in:' \
-  write_checklist "$readonly_dir/checklist.txt"
-chmod 700 "$readonly_dir"
-assert_file_eq 'existing checklist' "$readonly_dir/checklist.txt" \
+  write_checklist "$temporary_failure_destination"
+unset -f mktemp
+assert_file_eq 'existing checklist' "$temporary_failure_destination" \
   'preserves the previous checklist when temporary creation fails'
 
 export MOCK_INSTALLED='file-roller'
@@ -291,6 +313,28 @@ assert_file_excludes 'yay -Yc' "$MOCK_LOG" \
   'does not remove orphans after installation failure'
 assert_file_excludes 'yay -Scc' "$MOCK_LOG" \
   'does not clear caches after installation failure'
+export MOCK_FAIL=''
+
+printf 'old checklist\n' >"$final_checklist"
+export MOCK_FAIL='sudo pacman -Syu --needed micro fcitx5'
+: >"$MOCK_LOG"
+assert_fails_with 'stage failed: Install official packages' \
+  main "$TEST_TMP/valid.conf" "$final_checklist"
+assert_file_eq $'sudo -v\nsudo pacman -Syu --needed micro fcitx5' \
+  "$MOCK_LOG" 'stops immediately when the first package transaction fails'
+assert_file_eq 'old checklist' "$final_checklist" \
+  'preserves the checklist after official package installation failure'
+export MOCK_FAIL=''
+
+printf 'old checklist\n' >"$final_checklist"
+export MOCK_FAIL='yay -Scc'
+: >"$MOCK_LOG"
+assert_fails_with 'stage failed: Clear package caches' \
+  main "$TEST_TMP/valid.conf" "$final_checklist"
+assert_file_eq $'sudo -v\nsudo pacman -Syu --needed micro fcitx5\nyay -S --needed --removemake --cleanafter auto-cpufreq\nsudo pacman -Rns file-roller\nyay -Yc\nyay -Scc' \
+  "$MOCK_LOG" 'reports failure from the final cache-cleanup stage'
+assert_file_eq 'old checklist' "$final_checklist" \
+  'preserves the checklist after cache cleanup failure'
 export MOCK_FAIL=''
 
 portable_copy="$TEST_TMP/portable-copy"
