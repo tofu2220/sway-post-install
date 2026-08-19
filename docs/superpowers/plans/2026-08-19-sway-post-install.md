@@ -504,11 +504,12 @@ Expected: syntax validation exits 0; tests report `0 failed`; `git diff --check`
 Run:
 
 ```bash
-rg -n -- '--noconfirm|systemctl|eval|source post-install.conf' post-install.sh post-install.conf
+rg -n -- '--noconfirm|systemctl|eval|source .*post-install\.conf' post-install.sh
 rg -n -- 'pacman -Syu --needed|--removemake|--cleanafter|pacman -Rns|yay -Yc|yay -Scc' post-install.sh
+rg -n -- 'systemctl (mask power-profiles-daemon.service|enable auto-cpufreq.service|enable bluetooth)' post-install.conf
 ```
 
-Expected: the forbidden-pattern search returns no matches; the required-operation search finds all six operation patterns. Manually compare `post-install.conf` reminders with the Manual Checklist section of the spec and every manual instruction in `sway-eos.md`.
+Expected: the executable-code forbidden-pattern search returns no matches; the required-operation search finds all six operation patterns; and service commands appear only in the inert reminder config. Manually compare `post-install.conf` reminders with the Manual Checklist section of the spec and every manual instruction in `sway-eos.md`.
 
 - [ ] **Step 6: Commit the completed tool**
 
