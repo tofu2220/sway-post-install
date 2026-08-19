@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
+SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+
 PACMAN_PACKAGES=()
 AUR_PACKAGES=()
 REMOVE_PACKAGES=()
@@ -84,3 +86,55 @@ parse_config() {
     return 1
   }
 }
+
+require_commands() {
+  local command missing=0
+  for command in "$@"; do
+    if ! command -v "$command" >/dev/null 2>&1; then
+      printf 'ERROR: missing command: %s\n' "$command" >&2
+      missing=1
+    fi
+  done
+  return "$missing"
+}
+
+run_stage() {
+  local label=$1
+  shift
+  printf '==> %s\n' "$label"
+  "$@" || {
+    die "stage failed: $label"
+    return 1
+  }
+}
+
+install_packages() {
+  if ((${#PACMAN_PACKAGES[@]} > 0)); then
+    run_stage 'Install official packages' \
+      sudo pacman -Syu --needed "${PACMAN_PACKAGES[@]}" || return 1
+  fi
+  if ((${#AUR_PACKAGES[@]} > 0)); then
+    run_stage 'Install AUR packages' \
+      yay -S --needed --removemake --cleanafter "${AUR_PACKAGES[@]}" || return 1
+  fi
+}
+
+main() {
+  local config_path=${1:-"$SCRIPT_DIR/post-install.conf"}
+  local checklist_path=${2:-"$SCRIPT_DIR/manual-post-install-checklist.txt"}
+
+  ((EUID != 0)) || {
+    die 'run this script as a regular user, not root'
+    return 1
+  }
+  require_commands bash pacman yay sudo mktemp mv || return 1
+  parse_config "$config_path" || return 1
+  run_stage 'Authenticate sudo' sudo -v || return 1
+  install_packages || return 1
+
+  : "$checklist_path"
+}
+
+if [[ ${BASH_SOURCE[0]} == "$0" ]]; then
+  main "$@"
+fi
