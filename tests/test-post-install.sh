@@ -53,6 +53,30 @@ assert_file_eq() {
   assert_eq "$expected" "$actual" "$message"
 }
 
+assert_file_excludes() {
+  local unexpected=$1 path=$2 message=$3 actual
+  actual=$(<"$path")
+  if [[ $actual != *"$unexpected"* ]]; then
+    pass "$message"
+  else
+    printf 'FAIL: %s\n  unexpected: %q\n  actual:     %q\n' \
+      "$message" "$unexpected" "$actual" >&2
+    ((failed += 1))
+  fi
+}
+
+assert_file_starts_with() {
+  local expected=$1 path=$2 message=$3 actual
+  actual=$(<"$path")
+  if [[ $actual == "$expected"* ]]; then
+    pass "$message"
+  else
+    printf 'FAIL: %s\n  expected prefix: %q\n  actual:          %q\n' \
+      "$message" "$expected" "$actual" >&2
+    ((failed += 1))
+  fi
+}
+
 assert_succeeds() {
   local message=$1
   shift
@@ -110,7 +134,7 @@ setup_mocks() {
   MOCK_LOG="$TEST_TMP/commands.log"
   mkdir -p "$MOCK_BIN"
   : >"$MOCK_LOG"
-  export MOCK_LOG MOCK_FAIL=''
+  export MOCK_LOG MOCK_FAIL='' MOCK_INSTALLED=''
 
   local name
   for name in pacman yay sudo; do
@@ -118,6 +142,10 @@ setup_mocks() {
       '#!/usr/bin/env bash' \
       'command_name=$(basename -- "$0")' \
       'command_line="$command_name $*"' \
+      'if [[ $command_name == pacman && ${1:-} == -Qq ]]; then' \
+      '  [[ " ${MOCK_INSTALLED:-} " == *" ${2:-} "* ]]' \
+      '  exit' \
+      'fi' \
       'printf "%s\n" "$command_line" >>"$MOCK_LOG"' \
       '[[ ${MOCK_FAIL:-} != "$command_line" ]]' >"$MOCK_BIN/$name"
     chmod +x "$MOCK_BIN/$name"
@@ -163,8 +191,56 @@ assert_fails_with 'missing command: command-that-does-not-exist' \
 : >"$MOCK_LOG"
 assert_succeeds 'main authenticates and installs from a supplied config' \
   main "$TEST_TMP/valid.conf" "$TEST_TMP/unused-checklist.txt"
-assert_file_eq $'sudo -v\nsudo pacman -Syu --needed micro fcitx5\nyay -S --needed --removemake --cleanafter auto-cpufreq' \
+assert_file_starts_with $'sudo -v\nsudo pacman -Syu --needed micro fcitx5\nyay -S --needed --removemake --cleanafter auto-cpufreq' \
   "$MOCK_LOG" 'main authenticates before ordered installs'
+
+REMOVE_PACKAGES=(file-roller missing-package)
+export MOCK_INSTALLED='file-roller'
+: >"$MOCK_LOG"
+assert_succeeds 'removes only configured packages that are installed' \
+  remove_configured_packages
+assert_file_eq 'sudo pacman -Rns file-roller' "$MOCK_LOG" \
+  'uses one explicit removal transaction'
+
+REMOVE_PACKAGES=(file-roller)
+export MOCK_INSTALLED=''
+: >"$MOCK_LOG"
+assert_succeeds 'skips removal when no configured package is installed' \
+  remove_configured_packages
+assert_file_eq '' "$MOCK_LOG" 'does not start an empty removal transaction'
+
+: >"$MOCK_LOG"
+assert_succeeds 'removes orphans before clearing caches' clean_system
+assert_file_eq $'yay -Yc\nyay -Scc' "$MOCK_LOG" \
+  'uses conservative orphan detection and full cache cleanup in order'
+
+export MOCK_FAIL='yay -Yc'
+: >"$MOCK_LOG"
+assert_fails_with 'stage failed: Remove orphaned dependencies' clean_system
+assert_file_excludes 'yay -Scc' "$MOCK_LOG" \
+  'does not clear caches after orphan cleanup fails'
+
+export MOCK_FAIL='yay -Scc'
+: >"$MOCK_LOG"
+assert_fails_with 'stage failed: Clear package caches' clean_system
+export MOCK_FAIL=''
+
+export MOCK_INSTALLED='file-roller'
+: >"$MOCK_LOG"
+assert_succeeds 'main runs removal and cleanup after successful installs' \
+  main "$TEST_TMP/valid.conf" "$TEST_TMP/unused-checklist.txt"
+assert_file_eq $'sudo -v\nsudo pacman -Syu --needed micro fcitx5\nyay -S --needed --removemake --cleanafter auto-cpufreq\nsudo pacman -Rns file-roller\nyay -Yc\nyay -Scc' \
+  "$MOCK_LOG" 'main preserves the approved destructive-stage order'
+
+export MOCK_FAIL='sudo pacman -Rns file-roller'
+: >"$MOCK_LOG"
+assert_fails_with 'stage failed: Remove configured packages' \
+  main "$TEST_TMP/valid.conf" "$TEST_TMP/unused-checklist.txt"
+assert_file_excludes 'yay -Yc' "$MOCK_LOG" \
+  'does not remove orphans after explicit removal fails'
+assert_file_excludes 'yay -Scc' "$MOCK_LOG" \
+  'does not clear caches after explicit removal fails'
+export MOCK_FAIL=''
 
 printf '%d passed, %d failed\n' "$passed" "$failed"
 ((failed == 0))

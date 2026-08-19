@@ -119,6 +119,31 @@ install_packages() {
   fi
 }
 
+collect_installed_removals() {
+  local package
+  for package in "${REMOVE_PACKAGES[@]}"; do
+    if pacman -Qq "$package" >/dev/null 2>&1; then
+      printf '%s\0' "$package"
+    else
+      printf 'Skipping absent package: %s\n' "$package" >&2
+    fi
+  done
+}
+
+remove_configured_packages() {
+  local -a installed=()
+  mapfile -d '' -t installed < <(collect_installed_removals)
+  if ((${#installed[@]} > 0)); then
+    run_stage 'Remove configured packages' \
+      sudo pacman -Rns "${installed[@]}"
+  fi
+}
+
+clean_system() {
+  run_stage 'Remove orphaned dependencies' yay -Yc || return 1
+  run_stage 'Clear package caches' yay -Scc
+}
+
 main() {
   local config_path=${1:-"$SCRIPT_DIR/post-install.conf"}
   local checklist_path=${2:-"$SCRIPT_DIR/manual-post-install-checklist.txt"}
@@ -131,6 +156,8 @@ main() {
   parse_config "$config_path" || return 1
   run_stage 'Authenticate sudo' sudo -v || return 1
   install_packages || return 1
+  remove_configured_packages || return 1
+  clean_system || return 1
 
   : "$checklist_path"
 }
