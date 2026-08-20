@@ -7,6 +7,16 @@ echo " Configuration setup"
 echo "========================================"
 echo
 
+echo "==> Configuring Micro..."
+
+mkdir -p ~/.config/micro
+
+cat > ~/.config/micro/settings.json <<'EOF'
+{
+    "colorscheme": "simple"
+}
+EOF
+
 echo "==> Configuring Bash..."
 
 grep -Fqx 'export EDITOR="micro"' ~/.bashrc || \
@@ -69,9 +79,6 @@ echo
 echo "Manual GUI configuration:"
 echo
 cat <<'EOF'
-  - In Micro, run:
-      set colorscheme simple
-
   - Run fcitx5-configtool:
       Toggle Input Method: Alt + Left Shift
       Temporarily Toggle Input Method: Disabled
