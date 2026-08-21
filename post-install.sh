@@ -22,7 +22,7 @@ PACMAN_PKGS=(
 AUR_PKGS=(
   auto-cpufreq
   github-desktop-bin
-  docker-desktop
+  # docker-desktop
 )
 
 REMOVE_PKGS=(
