@@ -17,11 +17,12 @@ PACMAN_PKGS=(
   zoxide
   blueman
   qbittorrent
+  gitui
 )
 
 AUR_PKGS=(
   auto-cpufreq
-  github-desktop-bin
+  # github-desktop-bin
   # docker-desktop
 )
 
