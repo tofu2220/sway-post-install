@@ -11,6 +11,7 @@ PACMAN_PKGS=(
   xarchiver
   zip
   7zip
+  gnome-keyring
   zed
   github-cli
   uv
