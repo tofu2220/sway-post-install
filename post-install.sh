@@ -17,6 +17,7 @@ PACMAN_PKGS=(
   zoxide
   blueman
   qbittorrent
+  # gitui
 )
 
 AUR_PKGS=(
