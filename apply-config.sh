@@ -56,6 +56,16 @@ exec blueman-applet
 EOF
 fi
 
+if ! grep -Fqx 'exec thunar --daemon' "$AUTOSTART"; then
+  cat >> "$AUTOSTART" <<'EOF'
+
+# Thunar daemon
+# Keep Thunar running in the background so `thunar .` opens independently
+# from the terminal that launched it.
+exec thunar --daemon
+EOF
+fi
+
 if ! grep -Fqx 'include ~/.config/sway/outputs' "$OUTPUT"; then
   cat >> "$OUTPUT" <<'EOF'
 
