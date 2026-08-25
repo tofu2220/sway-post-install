@@ -2,7 +2,7 @@
 set -euo pipefail
 
 PACMAN_PKGS=(
-  # micro
+  micro
   fcitx5
   fcitx5-unikey
   fcitx5-configtool
