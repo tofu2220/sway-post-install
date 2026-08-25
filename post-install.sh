@@ -12,7 +12,7 @@ PACMAN_PKGS=(
   zip
   7zip
   gnome-keyring
-  zed
+  helix
   github-cli
   uv
   zoxide
