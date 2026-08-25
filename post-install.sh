@@ -2,7 +2,7 @@
 set -euo pipefail
 
 PACMAN_PKGS=(
-  micro
+  # micro
   fcitx5
   fcitx5-unikey
   fcitx5-configtool
@@ -12,7 +12,7 @@ PACMAN_PKGS=(
   zip
   7zip
   gnome-keyring
-  helix
+  zed
   github-cli
   uv
   zoxide
