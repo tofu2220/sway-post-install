@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+
 echo
 echo "========================================"
 echo " Configuration setup"
@@ -19,9 +21,10 @@ EOF
 
 echo "==> Configuring Foot..."
 
-FOOT_INI=~/.config/foot/foot.ini
+FOOT_INI="$HOME/.config/foot/foot.ini"
 
-sed -i 's/^[[:space:]]*background[[:space:]]*=.*/background=000000  # ColorBackground/' "$FOOT_INI"
+mkdir -p "$(dirname "$FOOT_INI")"
+install -m 644 "$SCRIPT_DIR/.config/foot/foot.ini" "$FOOT_INI"
 
 echo "==> Configuring Bash..."
 
