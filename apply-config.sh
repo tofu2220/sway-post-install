@@ -9,15 +9,15 @@ echo " Configuration setup"
 echo "========================================"
 echo
 
-echo "==> Configuring Micro..."
+# echo "==> Configuring Micro..."
 
-mkdir -p ~/.config/micro
+# mkdir -p ~/.config/micro
 
-cat > ~/.config/micro/settings.json <<'EOF'
-{
-    "colorscheme": "simple"
-}
-EOF
+# cat > ~/.config/micro/settings.json <<'EOF'
+# {
+#     "colorscheme": "simple"
+# }
+# EOF
 
 echo "==> Configuring Foot..."
 
