@@ -28,21 +28,7 @@ install -m 644 "$SCRIPT_DIR/.config/foot/foot.ini" "$FOOT_INI"
 
 echo "==> Configuring Bash..."
 
-grep -Fqx 'export EDITOR="micro"' ~/.bashrc || \
-  echo 'export EDITOR="micro"' >> ~/.bashrc
-
-grep -Fqx 'eval "$(zoxide init bash)"' ~/.bashrc || \
-  echo 'eval "$(zoxide init bash)"' >> ~/.bashrc
-
-sed -i '/^[[:space:]]*PS1=/c\
-RESET='\''\\[\\e[0m\\]'\''\
-BOLD='\''\\[\\e[1m\\]'\''\
-BLUE='\''\\[\\e[38;5;75m\\]'\''\
-GREEN='\''\\[\\e[38;5;114m\\]'\''\
-PURPLE='\''\\[\\e[38;5;141m\\]'\''\
-GRAY='\''\\[\\e[38;5;245m\\]'\''\
-\
-PS1="${GRAY}╭─${GREEN}\\u${GRAY}@${BLUE}\\h ${PURPLE}\\w${RESET}\\n${GRAY}╰─${BOLD}\\$ ${RESET}"' ~/.bashrc
+install -m 644 "$SCRIPT_DIR/.bashrc" "$HOME/.bashrc"
 
 echo "==> Configuring Sway..."
 
