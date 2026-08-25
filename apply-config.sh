@@ -17,6 +17,12 @@ cat > ~/.config/micro/settings.json <<'EOF'
 }
 EOF
 
+echo "==> Configuring Foot..."
+
+FOOT_INI=~/.config/foot/foot.ini
+
+sed -i 's/^[[:space:]]*background[[:space:]]*=.*/background=000000  # ColorBackground/' "$FOOT_INI"
+
 echo "==> Configuring Bash..."
 
 grep -Fqx 'export EDITOR="micro"' ~/.bashrc || \
