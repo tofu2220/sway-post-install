@@ -26,6 +26,13 @@ FOOT_INI="$HOME/.config/foot/foot.ini"
 mkdir -p "$(dirname "$FOOT_INI")"
 install -m 644 "$SCRIPT_DIR/.config/foot/foot.ini" "$FOOT_INI"
 
+echo "==> Configuring Helix..."
+
+HELIX_CONFIG="$HOME/.config/helix/config.toml"
+
+mkdir -p "$(dirname "$HELIX_CONFIG")"
+install -m 644 "$SCRIPT_DIR/.config/helix/config.toml" "$HELIX_CONFIG"
+
 echo "==> Configuring Bash..."
 
 install -m 644 "$SCRIPT_DIR/.bashrc" "$HOME/.bashrc"
