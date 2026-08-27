@@ -33,6 +33,13 @@ HELIX_CONFIG="$HOME/.config/helix/config.toml"
 mkdir -p "$(dirname "$HELIX_CONFIG")"
 install -m 644 "$SCRIPT_DIR/.config/helix/config.toml" "$HELIX_CONFIG"
 
+echo "==> Configuring Swayimg..."
+
+SWAYIMG_CONFIG="$HOME/.config/swayimg/init.lua"
+
+mkdir -p "$(dirname "$SWAYIMG_CONFIG")"
+install -m 644 "$SCRIPT_DIR/.config/swayimg/init.lua" "$SWAYIMG_CONFIG"
+
 echo "==> Configuring Bash..."
 
 install -m 644 "$SCRIPT_DIR/.bashrc" "$HOME/.bashrc"

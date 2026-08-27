@@ -10,6 +10,7 @@ PACMAN_PKGS=(
   fcitx5-configtool
   nwg-displays
   mpv
+  swayimg
   xarchiver
   zip
   7zip

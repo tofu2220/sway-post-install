@@ -1,0 +1,1 @@
+swayimg.imagelist.adjacent = true
